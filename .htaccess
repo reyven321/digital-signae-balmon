@@ -1,0 +1,12 @@
+# Prevent directory listing
+Options -Indexes
+
+# Allow PHP files
+<FilesMatch "\.php$">
+    Require all granted
+</FilesMatch>
+
+# Allow image files in uploads folder
+<FilesMatch "\.(jpg|jpeg|png|gif)$">
+    Require all granted
+</FilesMatch>
