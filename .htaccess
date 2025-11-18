@@ -1,12 +1,44 @@
-# Prevent directory listing
+# .htaccess - Digital Signage BMFR Kelas II Manado
+# Root project .htaccess
+
+# Increase PHP upload limits
+php_value upload_max_filesize 50M
+php_value post_max_size 52M
+php_value max_execution_time 300
+php_value max_input_time 300
+php_value memory_limit 256M
+
+# Enable error logging
+php_flag display_errors off
+php_flag log_errors on
+
+# Security: Prevent directory listing
 Options -Indexes
+
+# Protect config files
+<Files "config.php">
+    Require all denied
+</Files>
 
 # Allow PHP files
 <FilesMatch "\.php$">
     Require all granted
 </FilesMatch>
 
-# Allow image files in uploads folder
-<FilesMatch "\.(jpg|jpeg|png|gif)$">
+# Allow image and video files (PENTING!)
+<FilesMatch "\.(jpg|jpeg|png|gif|webp|mp4|webm|ogg|avi|mov)$">
     Require all granted
-</FilesMatch>
+    </FilesMatch>
+
+    # Allow large file uploads
+    LimitRequestBody 52428800
+
+# Set proper MIME types for videos
+AddType video/mp4 .mp4 .MP4
+AddType video/webm .webm
+AddType video/ogg .ogg .ogv
+AddType video/quicktime .mov
+AddType image/webp .webp
+
+# Enable CORS for local testing (optional, uncomment if needed)
+# Header set Access-Control-Allow-Origin "*"
