@@ -93,11 +93,12 @@ if ($file['error'] !== UPLOAD_ERR_OK) {
     sendResponse(false, $errorMsg);
 }
 
-// Validasi ukuran file (50MB)
-$maxSize = 50 * 1024 * 1024; // 50MB dalam bytes
+// Validasi ukuran file (200MB)
+$maxSize = 200 * 1024 * 1024; // 200MB dalam bytes  ← SUDAH DIUBAH
 if ($file['size'] > $maxSize) {
-    sendResponse(false, 'File terlalu besar. Maksimal 50MB');
+    sendResponse(false, 'File terlalu besar. Maksimal 200MB');
 }
+
 
 // Deteksi tipe file
 $finfo = finfo_open(FILEINFO_MIME_TYPE);

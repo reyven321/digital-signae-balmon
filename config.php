@@ -214,6 +214,7 @@ function displayDatabaseError($errorMessage) {
 // Folder upload
 define('UPLOAD_DIR', __DIR__ . '/uploads/');
 define('UPLOAD_URL', 'uploads/');
+define('BACKUP_DIR', __DIR__ . '/backups/');
 
 // Allowed file types
 define('ALLOWED_IMAGE_EXT', ['jpg', 'jpeg', 'png', 'gif']);

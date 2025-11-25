@@ -32,9 +32,10 @@ define('BACKUP_DIR', __DIR__ . '/backups/');
 define('LOG_DIR', __DIR__ . '/logs/');
 
 // File Configuration
+// File Configuration
 define('ALLOWED_IMAGE_EXT', ['jpg', 'jpeg', 'png', 'gif', 'webp']);
 define('ALLOWED_VIDEO_EXT', ['mp4', 'webm', 'ogg']);
-define('MAX_FILE_SIZE', 50 * 1024 * 1024); // 50MB
+define('MAX_FILE_SIZE', 200 * 1024 * 1024); // 200MB ← SUDAH DIUBAH
 
 // MIME Type Whitelist (SECURITY ENHANCEMENT)
 define('ALLOWED_IMAGE_MIMES', [
