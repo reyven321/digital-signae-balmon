@@ -219,7 +219,7 @@ define('BACKUP_DIR', __DIR__ . '/backups/');
 // Allowed file types
 define('ALLOWED_IMAGE_EXT', ['jpg', 'jpeg', 'png', 'gif']);
 define('ALLOWED_VIDEO_EXT', ['mp4', 'webm', 'ogg']);
-define('MAX_FILE_SIZE', 200 * 1024 * 1024); // 50MB
+define('MAX_FILE_SIZE', 200 * 1024 * 1024); // 200mb
 
 // Buat folder upload jika belum ada
 if (!file_exists(UPLOAD_DIR)) {
