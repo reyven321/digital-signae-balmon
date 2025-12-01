@@ -359,13 +359,6 @@ function fileExistsCheck($path) {
                     <p>Kelola user, role akses, dan permission sistem.</p>
                 </a>
                 
-                <a href="management/manage_rss.php" class="menu-card">
-                    <span class="status-badge available">✓ Available</span>
-                    <div class="icon">📰</div>
-                    <h3>RSS Feed Manager</h3>
-                    <p>Kelola feed berita otomatis untuk ditampilkan di layar.</p>
-                </a>
-                
                 <a href="management/manage_backup.php" class="menu-card">
                     <span class="status-badge available">✓ Available</span>
                     <div class="icon">💾</div>

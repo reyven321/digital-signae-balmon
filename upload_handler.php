@@ -1,7 +1,7 @@
 <?php
 /**
  * UPLOAD HANDLER - Digital Signage BMFR
- * Menangani upload gambar dan video
+ * Upload TANPA judul dan deskripsi wajib
  * Path: upload_handler.php
  */
 
@@ -12,7 +12,7 @@ requireLogin();
 
 // Aktifkan error reporting untuk debugging
 error_reporting(E_ALL);
-ini_set('display_errors', 0); // Jangan tampilkan error di output
+ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
 // Function untuk mengirim response JSON
@@ -31,12 +31,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     sendResponse(false, 'Method tidak diizinkan');
 }
 
-// Validasi required fields
-$requiredFields = ['tipe_layar', 'nomor_layar', 'judul', 'durasi'];
+// UPDATED: Hanya tipe_layar, nomor_layar, dan durasi yang wajib
+$requiredFields = ['tipe_layar', 'nomor_layar', 'durasi'];
 $errors = [];
 
 foreach ($requiredFields as $field) {
-    if (empty($_POST[$field])) {
+    if (!isset($_POST[$field]) || $_POST[$field] === '') {
         $errors[] = "Field '$field' wajib diisi";
     }
 }
@@ -53,10 +53,15 @@ if (!empty($errors)) {
 // Ambil data dari POST
 $tipe_layar = $_POST['tipe_layar'];
 $nomor_layar = (int)$_POST['nomor_layar'];
-$judul = trim($_POST['judul']);
-$deskripsi = trim($_POST['deskripsi'] ?? '');
 $durasi = (int)$_POST['durasi'];
 $urutan = (int)($_POST['urutan'] ?? 0);
+
+// UPDATED: Judul dan deskripsi OPSIONAL - gunakan default dari filename jika kosong
+$file = $_FILES['file'];
+$originalFilename = pathinfo($file['name'], PATHINFO_FILENAME);
+
+$judul = trim($_POST['judul'] ?? '') ?: $originalFilename; // Default: nama file
+$deskripsi = trim($_POST['deskripsi'] ?? ''); // Default: kosong
 
 // Validasi tipe layar
 if (!in_array($tipe_layar, ['external', 'internal'])) {
@@ -64,7 +69,7 @@ if (!in_array($tipe_layar, ['external', 'internal'])) {
 }
 
 // Validasi nomor layar
-$maxLayar = $tipe_layar === 'external' ? 4 : 2;
+$maxLayar = $tipe_layar === 'external' ? 4 : 3;
 if ($nomor_layar < 1 || $nomor_layar > $maxLayar) {
     sendResponse(false, "Nomor layar harus antara 1-$maxLayar");
 }
@@ -73,9 +78,6 @@ if ($nomor_layar < 1 || $nomor_layar > $maxLayar) {
 if ($durasi < 1 || $durasi > 60) {
     sendResponse(false, 'Durasi harus antara 1-60 detik');
 }
-
-// Proses file upload
-$file = $_FILES['file'];
 
 // Cek error upload
 $uploadErrors = [
@@ -94,11 +96,10 @@ if ($file['error'] !== UPLOAD_ERR_OK) {
 }
 
 // Validasi ukuran file (200MB)
-$maxSize = 200 * 1024 * 1024; // 200MB dalam bytes  ← SUDAH DIUBAH
+$maxSize = 200 * 1024 * 1024; // 200MB
 if ($file['size'] > $maxSize) {
     sendResponse(false, 'File terlalu besar. Maksimal 200MB');
 }
-
 
 // Deteksi tipe file
 $finfo = finfo_open(FILEINFO_MIME_TYPE);
@@ -145,7 +146,7 @@ if (!file_exists($uploadDir)) {
 
 // Cek permission folder
 if (!is_writable($uploadDir)) {
-    sendResponse(false, 'Folder uploads tidak memiliki permission untuk menulis. Jalankan: chmod 755 uploads/');
+    sendResponse(false, 'Folder uploads tidak memiliki permission untuk menulis');
 }
 
 // Upload file
@@ -159,26 +160,68 @@ if (!move_uploaded_file($file['tmp_name'], $uploadPath)) {
 try {
     $conn = getConnection();
     
-    $stmt = $conn->prepare(
-        "INSERT INTO konten_layar 
-        (tipe_layar, nomor_layar, judul, deskripsi, gambar, video, durasi, urutan, status, created_at) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'aktif', NOW())"
-    );
+    // Cek apakah kolom 'video' ada
+    $videoColCheck = $conn->query("SHOW COLUMNS FROM konten_layar LIKE 'video'");
+    $hasVideoCol = $videoColCheck && $videoColCheck->num_rows > 0;
     
-    $gambar = $isImage ? $filename : null;
-    $video = $isVideo ? $filename : null;
-    
-    $stmt->bind_param(
-        "sissssii",
-        $tipe_layar,
-        $nomor_layar,
-        $judul,
-        $deskripsi,
-        $gambar,
-        $video,
-        $durasi,
-        $urutan
-    );
+    if ($isImage) {
+        // Upload Gambar
+        $stmt = $conn->prepare(
+            "INSERT INTO konten_layar 
+            (tipe_layar, nomor_layar, judul, deskripsi, gambar, durasi, urutan, status, created_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'aktif', NOW())"
+        );
+        
+        $stmt->bind_param(
+            "sisssii",
+            $tipe_layar,
+            $nomor_layar,
+            $judul,
+            $deskripsi,
+            $filename,
+            $durasi,
+            $urutan
+        );
+    } else {
+        // Upload Video
+        if ($hasVideoCol) {
+            // Tabel sudah punya kolom video
+            $stmt = $conn->prepare(
+                "INSERT INTO konten_layar 
+                (tipe_layar, nomor_layar, judul, deskripsi, video, durasi, urutan, status, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'aktif', NOW())"
+            );
+            
+            $stmt->bind_param(
+                "sisssii",
+                $tipe_layar,
+                $nomor_layar,
+                $judul,
+                $deskripsi,
+                $filename,
+                $durasi,
+                $urutan
+            );
+        } else {
+            // Fallback: gunakan kolom gambar untuk video
+            $stmt = $conn->prepare(
+                "INSERT INTO konten_layar 
+                (tipe_layar, nomor_layar, judul, deskripsi, gambar, durasi, urutan, status, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'aktif', NOW())"
+            );
+            
+            $stmt->bind_param(
+                "sisssii",
+                $tipe_layar,
+                $nomor_layar,
+                $judul,
+                $deskripsi,
+                $filename,
+                $durasi,
+                $urutan
+            );
+        }
+    }
     
     if ($stmt->execute()) {
         $insertId = $stmt->insert_id;
@@ -188,6 +231,7 @@ try {
         sendResponse(true, 'Konten berhasil diupload', [
             'id' => $insertId,
             'filename' => $filename,
+            'judul' => $judul,
             'type' => $isImage ? 'image' : 'video'
         ]);
     } else {
