@@ -338,7 +338,7 @@ function displayAccessDenied($requiredRole = null, $requiredPermission = null) {
                 Hubungi administrator sistem untuk mengubah role atau permission Anda.
             </p>
             
-            <a href="<?= strpos($_SERVER['PHP_SELF'], '/management/') !== false ? '../dashboard.php' : 'dashboard.php' ?>" class="btn">
+            <a href="<?= strpos($_SERVER['PHP_SELF'], '/management/') !== false ? '../dashboard_modern.php' : 'dashboard_modern.php' ?>" class="btn">
                 ← Kembali ke Dashboard
             </a>
             <a href="<?= strpos($_SERVER['PHP_SELF'], '/management/') !== false ? '../auth/logout.php' : 'auth/logout.php' ?>" class="btn btn-secondary">

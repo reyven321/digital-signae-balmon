@@ -1,249 +1,254 @@
 <?php
 /**
- * UPLOAD HANDLER - Digital Signage BMFR
- * Upload TANPA judul dan deskripsi wajib
- * Path: upload_handler.php
+ * UPLOAD HANDLER - Digital Signage BMFR Kelas II Manado
+ * Handler untuk upload konten (gambar/video) ke database dan folder uploads
+ * Path: upload_handler.php (di root folder)
  */
 
-header('Content-Type: application/json');
+// Prevent any output before JSON
+ob_start();
 
-require_once 'config.php';
-requireLogin();
+// Set header JSON
+header('Content-Type: application/json; charset=utf-8');
 
-// Aktifkan error reporting untuk debugging
+// Error handling
 error_reporting(E_ALL);
-ini_set('display_errors', 0);
-ini_set('log_errors', 1);
+ini_set('display_errors', 0); // Jangan tampilkan error di output
 
-// Function untuk mengirim response JSON
-function sendResponse($success, $message, $data = null, $errors = null) {
-    echo json_encode([
-        'success' => $success,
-        'message' => $message,
-        'data' => $data,
-        'errors' => $errors
-    ]);
-    exit;
-}
-
-// Validasi request method
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    sendResponse(false, 'Method tidak diizinkan');
-}
-
-// UPDATED: Hanya tipe_layar, nomor_layar, dan durasi yang wajib
-$requiredFields = ['tipe_layar', 'nomor_layar', 'durasi'];
-$errors = [];
-
-foreach ($requiredFields as $field) {
-    if (!isset($_POST[$field]) || $_POST[$field] === '') {
-        $errors[] = "Field '$field' wajib diisi";
-    }
-}
-
-// Validasi file upload
-if (!isset($_FILES['file']) || $_FILES['file']['error'] === UPLOAD_ERR_NO_FILE) {
-    $errors[] = "File wajib diupload";
-}
-
-if (!empty($errors)) {
-    sendResponse(false, 'Validasi gagal', null, $errors);
-}
-
-// Ambil data dari POST
-$tipe_layar = $_POST['tipe_layar'];
-$nomor_layar = (int)$_POST['nomor_layar'];
-$durasi = (int)$_POST['durasi'];
-$urutan = (int)($_POST['urutan'] ?? 0);
-
-// UPDATED: Judul dan deskripsi OPSIONAL - gunakan default dari filename jika kosong
-$file = $_FILES['file'];
-$originalFilename = pathinfo($file['name'], PATHINFO_FILENAME);
-
-$judul = trim($_POST['judul'] ?? '') ?: $originalFilename; // Default: nama file
-$deskripsi = trim($_POST['deskripsi'] ?? ''); // Default: kosong
-
-// Validasi tipe layar
-if (!in_array($tipe_layar, ['external', 'internal'])) {
-    sendResponse(false, 'Tipe layar tidak valid');
-}
-
-// Validasi nomor layar
-$maxLayar = $tipe_layar === 'external' ? 4 : 3;
-if ($nomor_layar < 1 || $nomor_layar > $maxLayar) {
-    sendResponse(false, "Nomor layar harus antara 1-$maxLayar");
-}
-
-// Validasi durasi
-if ($durasi < 1 || $durasi > 60) {
-    sendResponse(false, 'Durasi harus antara 1-60 detik');
-}
-
-// Cek error upload
-$uploadErrors = [
-    UPLOAD_ERR_INI_SIZE => 'File terlalu besar (melebihi upload_max_filesize di php.ini)',
-    UPLOAD_ERR_FORM_SIZE => 'File terlalu besar (melebihi MAX_FILE_SIZE di form)',
-    UPLOAD_ERR_PARTIAL => 'File hanya terupload sebagian',
-    UPLOAD_ERR_NO_FILE => 'Tidak ada file yang diupload',
-    UPLOAD_ERR_NO_TMP_DIR => 'Folder temporary tidak ditemukan',
-    UPLOAD_ERR_CANT_WRITE => 'Gagal menulis file ke disk',
-    UPLOAD_ERR_EXTENSION => 'Upload dihentikan oleh extension PHP'
-];
-
-if ($file['error'] !== UPLOAD_ERR_OK) {
-    $errorMsg = $uploadErrors[$file['error']] ?? 'Error upload tidak diketahui';
-    sendResponse(false, $errorMsg);
-}
-
-// Validasi ukuran file (200MB)
-$maxSize = 200 * 1024 * 1024; // 200MB
-if ($file['size'] > $maxSize) {
-    sendResponse(false, 'File terlalu besar. Maksimal 200MB');
-}
-
-// Deteksi tipe file
-$finfo = finfo_open(FILEINFO_MIME_TYPE);
-$mimeType = finfo_file($finfo, $file['tmp_name']);
-finfo_close($finfo);
-
-// Allowed MIME types
-$allowedImages = [
-    'image/jpeg',
-    'image/png',
-    'image/gif',
-    'image/webp',
-    'image/jpg'
-];
-
-$allowedVideos = [
-    'video/mp4',
-    'video/webm',
-    'video/ogg',
-    'video/quicktime',
-    'video/x-msvideo'
-];
-
-$isImage = in_array($mimeType, $allowedImages);
-$isVideo = in_array($mimeType, $allowedVideos);
-
-if (!$isImage && !$isVideo) {
-    sendResponse(false, "Tipe file tidak didukung: $mimeType. Hanya gambar (JPG, PNG, GIF, WebP) dan video (MP4, WebM, OGG) yang diperbolehkan");
-}
-
-// Generate unique filename
-$extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-$filename = uniqid() . '_' . time() . '.' . strtolower($extension);
-
-// Tentukan folder upload
-$uploadDir = __DIR__ . '/uploads/';
-
-// Buat folder jika belum ada
-if (!file_exists($uploadDir)) {
-    if (!mkdir($uploadDir, 0755, true)) {
-        sendResponse(false, 'Gagal membuat folder uploads');
-    }
-}
-
-// Cek permission folder
-if (!is_writable($uploadDir)) {
-    sendResponse(false, 'Folder uploads tidak memiliki permission untuk menulis');
-}
-
-// Upload file
-$uploadPath = $uploadDir . $filename;
-
-if (!move_uploaded_file($file['tmp_name'], $uploadPath)) {
-    sendResponse(false, 'Gagal memindahkan file ke folder uploads');
-}
-
-// Insert ke database
 try {
-    $conn = getConnection();
+    // Include config
+    require_once 'config.php';
     
-    // Cek apakah kolom 'video' ada
-    $videoColCheck = $conn->query("SHOW COLUMNS FROM konten_layar LIKE 'video'");
-    $hasVideoCol = $videoColCheck && $videoColCheck->num_rows > 0;
+    // Check if user logged in
+    requireLogin();
     
-    if ($isImage) {
-        // Upload Gambar
-        $stmt = $conn->prepare(
-            "INSERT INTO konten_layar 
-            (tipe_layar, nomor_layar, judul, deskripsi, gambar, durasi, urutan, status, created_at) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'aktif', NOW())"
-        );
-        
-        $stmt->bind_param(
-            "sisssii",
-            $tipe_layar,
-            $nomor_layar,
-            $judul,
-            $deskripsi,
-            $filename,
-            $durasi,
-            $urutan
-        );
-    } else {
-        // Upload Video
-        if ($hasVideoCol) {
-            // Tabel sudah punya kolom video
-            $stmt = $conn->prepare(
-                "INSERT INTO konten_layar 
-                (tipe_layar, nomor_layar, judul, deskripsi, video, durasi, urutan, status, created_at) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'aktif', NOW())"
-            );
-            
-            $stmt->bind_param(
-                "sisssii",
-                $tipe_layar,
-                $nomor_layar,
-                $judul,
-                $deskripsi,
-                $filename,
-                $durasi,
-                $urutan
-            );
-        } else {
-            // Fallback: gunakan kolom gambar untuk video
-            $stmt = $conn->prepare(
-                "INSERT INTO konten_layar 
-                (tipe_layar, nomor_layar, judul, deskripsi, gambar, durasi, urutan, status, created_at) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'aktif', NOW())"
-            );
-            
-            $stmt->bind_param(
-                "sisssii",
-                $tipe_layar,
-                $nomor_layar,
-                $judul,
-                $deskripsi,
-                $filename,
-                $durasi,
-                $urutan
-            );
+    // Validasi request method
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        throw new Exception('Method tidak valid. Harus POST.');
+    }
+    
+    // Validasi required fields
+    $required_fields = ['judul', 'tipe_layar', 'nomor_layar', 'durasi'];
+    $errors = [];
+    
+    foreach ($required_fields as $field) {
+        if (!isset($_POST[$field]) || empty(trim($_POST[$field]))) {
+            $errors[] = "Field '$field' wajib diisi";
         }
     }
     
-    if ($stmt->execute()) {
-        $insertId = $stmt->insert_id;
-        $stmt->close();
-        $conn->close();
-        
-        sendResponse(true, 'Konten berhasil diupload', [
-            'id' => $insertId,
-            'filename' => $filename,
-            'judul' => $judul,
-            'type' => $isImage ? 'image' : 'video'
+    if (!empty($errors)) {
+        ob_end_clean();
+        echo json_encode([
+            'success' => false,
+            'error' => 'Data tidak lengkap',
+            'errors' => $errors
         ]);
-    } else {
-        // Hapus file jika insert gagal
-        unlink($uploadPath);
-        sendResponse(false, 'Gagal menyimpan ke database: ' . $stmt->error);
+        exit;
     }
     
-} catch (Exception $e) {
-    // Hapus file jika terjadi error
-    if (file_exists($uploadPath)) {
-        unlink($uploadPath);
+    // Validasi file upload
+    if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
+        $error_msg = 'File tidak ada atau gagal diupload';
+        
+        if (isset($_FILES['file']['error'])) {
+            switch ($_FILES['file']['error']) {
+                case UPLOAD_ERR_INI_SIZE:
+                case UPLOAD_ERR_FORM_SIZE:
+                    $error_msg = 'Ukuran file terlalu besar';
+                    break;
+                case UPLOAD_ERR_PARTIAL:
+                    $error_msg = 'File hanya terupload sebagian';
+                    break;
+                case UPLOAD_ERR_NO_FILE:
+                    $error_msg = 'Tidak ada file yang diupload';
+                    break;
+                default:
+                    $error_msg = 'Error upload: ' . $_FILES['file']['error'];
+            }
+        }
+        
+        ob_end_clean();
+        echo json_encode([
+            'success' => false,
+            'error' => $error_msg
+        ]);
+        exit;
     }
-    sendResponse(false, 'Terjadi kesalahan: ' . $e->getMessage());
+    
+    // Get data dari POST
+    $judul = trim($_POST['judul']);
+    $tipe_layar = trim($_POST['tipe_layar']);
+    $nomor_layar = (int)$_POST['nomor_layar'];
+    $durasi = (int)$_POST['durasi'];
+    $urutan = isset($_POST['urutan']) ? (int)$_POST['urutan'] : 0;
+    
+    // Validasi tipe layar
+    if (!in_array($tipe_layar, ['external', 'internal'])) {
+        ob_end_clean();
+        echo json_encode([
+            'success' => false,
+            'error' => 'Tipe layar tidak valid. Harus "external" atau "internal"'
+        ]);
+        exit;
+    }
+    
+    // Validasi nomor layar
+    $max_layar = ($tipe_layar === 'external') ? 4 : 1;
+    if ($nomor_layar < 1 || $nomor_layar > $max_layar) {
+        ob_end_clean();
+        echo json_encode([
+            'success' => false,
+            'error' => "Nomor layar tidak valid. Harus 1-$max_layar untuk $tipe_layar"
+        ]);
+        exit;
+    }
+    
+    // Get file info
+    $file = $_FILES['file'];
+    $file_name = $file['name'];
+    $file_tmp = $file['tmp_name'];
+    $file_size = $file['size'];
+    $file_error = $file['error'];
+    
+    // Get file extension
+    $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+    
+    // Allowed extensions
+    $allowed_images = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    $allowed_videos = ['mp4', 'webm', 'ogg'];
+    $allowed_extensions = array_merge($allowed_images, $allowed_videos);
+    
+    // Validasi extension
+    if (!in_array($file_ext, $allowed_extensions)) {
+        ob_end_clean();
+        echo json_encode([
+            'success' => false,
+            'error' => 'Format file tidak didukung. Format yang didukung: ' . implode(', ', $allowed_extensions)
+        ]);
+        exit;
+    }
+    
+    // Determine media type
+    $is_image = in_array($file_ext, $allowed_images);
+    $is_video = in_array($file_ext, $allowed_videos);
+    
+    // Validasi file size (max 200MB)
+    $max_size = 200 * 1024 * 1024; // 200MB in bytes
+    if ($file_size > $max_size) {
+        ob_end_clean();
+        echo json_encode([
+            'success' => false,
+            'error' => 'Ukuran file terlalu besar. Maksimal 200MB'
+        ]);
+        exit;
+    }
+    
+    // Create uploads directory if not exists
+    $upload_dir = __DIR__ . '/uploads/';
+    if (!file_exists($upload_dir)) {
+        if (!mkdir($upload_dir, 0755, true)) {
+            ob_end_clean();
+            echo json_encode([
+                'success' => false,
+                'error' => 'Gagal membuat folder uploads. Periksa permission folder.'
+            ]);
+            exit;
+        }
+    }
+    
+    // Generate unique filename
+    $new_filename = uniqid() . '_' . time() . '.' . $file_ext;
+    $upload_path = $upload_dir . $new_filename;
+    
+    // Move uploaded file
+    if (!move_uploaded_file($file_tmp, $upload_path)) {
+        ob_end_clean();
+        echo json_encode([
+            'success' => false,
+            'error' => 'Gagal menyimpan file. Periksa permission folder uploads/'
+        ]);
+        exit;
+    }
+    
+    // Insert to database
+    $conn = getConnection();
+    
+    // Prepare SQL
+    $sql = "INSERT INTO konten_layar (judul, tipe_layar, nomor_layar, durasi, urutan, status";
+    
+    if ($is_image) {
+        $sql .= ", gambar";
+    } elseif ($is_video) {
+        $sql .= ", video";
+    }
+    
+    $sql .= ") VALUES (?, ?, ?, ?, ?, 'aktif'";
+    
+    if ($is_image || $is_video) {
+        $sql .= ", ?";
+    }
+    
+    $sql .= ")";
+    
+    $stmt = $conn->prepare($sql);
+    
+    if (!$stmt) {
+        // Delete uploaded file if SQL prepare fails
+        unlink($upload_path);
+        ob_end_clean();
+        echo json_encode([
+            'success' => false,
+            'error' => 'Gagal prepare SQL: ' . $conn->error
+        ]);
+        exit;
+    }
+    
+    // Bind parameters
+    if ($is_image || $is_video) {
+        $stmt->bind_param("ssiiss", $judul, $tipe_layar, $nomor_layar, $durasi, $urutan, $new_filename);
+    } else {
+        $stmt->bind_param("ssiis", $judul, $tipe_layar, $nomor_layar, $durasi, $urutan);
+    }
+    
+    // Execute
+    if (!$stmt->execute()) {
+        // Delete uploaded file if insert fails
+        unlink($upload_path);
+        ob_end_clean();
+        echo json_encode([
+            'success' => false,
+            'error' => 'Gagal menyimpan ke database: ' . $stmt->error
+        ]);
+        exit;
+    }
+    
+    $insert_id = $stmt->insert_id;
+    $stmt->close();
+    $conn->close();
+    
+    // Clear output buffer and return success
+    ob_end_clean();
+    echo json_encode([
+        'success' => true,
+        'message' => 'Konten berhasil diupload!',
+        'data' => [
+            'id' => $insert_id,
+            'judul' => $judul,
+            'filename' => $new_filename,
+            'type' => $is_image ? 'image' : 'video',
+            'size' => $file_size
+        ]
+    ]);
+    
+} catch (Exception $e) {
+    // Clear output buffer and return error
+    ob_end_clean();
+    echo json_encode([
+        'success' => false,
+        'error' => 'Exception: ' . $e->getMessage(),
+        'file' => $e->getFile(),
+        'line' => $e->getLine()
+    ]);
 }
+exit;
