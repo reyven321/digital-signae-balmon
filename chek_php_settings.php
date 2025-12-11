@@ -20,7 +20,7 @@ $postMax = ini_get('post_max_size');
 
 $uploadBytes = parseSize($uploadMax);
 $postBytes = parseSize($postMax);
-$targetSize = 200 * 1024 * 1024; // 200MB
+$targetSize = 200 * 1024 * 1024; // 300MB
 
 echo json_encode([
     'upload_max' => $uploadMax,

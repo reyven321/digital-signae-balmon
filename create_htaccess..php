@@ -60,7 +60,7 @@ Options -Indexes
     Require all granted
 </FilesMatch>
 
-# Allow large file uploads (200MB)
+# Allow large file uploads (300MB)
 LimitRequestBody 209715200
 
 # Set proper MIME types for videos
@@ -384,7 +384,7 @@ HTACCESS;
         <div class="info-box">
             <h3>📋 Apa yang akan dibuat?</h3>
             <ul>
-                <li><strong>ROOT .htaccess:</strong> Setting upload 200MB, security headers, MIME types</li>
+                <li><strong>ROOT .htaccess:</strong> Setting upload 300MB, security headers, MIME types</li>
                 <li><strong>uploads/.htaccess:</strong> Prevent PHP execution, allow only media files</li>
             </ul>
         </div>

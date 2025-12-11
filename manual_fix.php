@@ -246,7 +246,7 @@ notepad .htaccess</div>
         <h2>⚙️ FIX 4: PHP Settings (upload_max_filesize)</h2>
         
         <div class="step">
-            <h3>Edit php.ini untuk 200MB Upload</h3>
+            <h3>Edit php.ini untuk 300MB Upload</h3>
             <ol>
                 <li>Buka file: <span class="highlight">C:\xampp\php\php.ini</span></li>
                 <li>Cari (Ctrl+F): <span class="highlight">upload_max_filesize</span></li>

@@ -167,9 +167,9 @@ try {
         sendJSON(false, 'Format tidak didukung');
     }
     
-    // Check size (200MB)
+    // Check size (300MB)
     if ($file['size'] > 200 * 1024 * 1024) {
-        sendJSON(false, 'File terlalu besar (max 200MB)');
+        sendJSON(false, 'File terlalu besar (max 300MB)');
     }
     
     // Create uploads dir
@@ -259,7 +259,7 @@ PHP;
     }
     
     $uploadBytes = parseSize($uploadMax);
-    $targetSize = 200 * 1024 * 1024; // 200MB
+    $targetSize = 200 * 1024 * 1024; // 300MB
     
     if ($uploadBytes < $targetSize) {
         $errors[] = "⚠️ upload_max_filesize terlalu kecil (current: $uploadMax, need: 200M)";

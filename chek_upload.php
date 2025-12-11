@@ -40,7 +40,7 @@ function parseSize($size) {
 
 $upload_bytes = parseSize($upload_max);
 $post_bytes = parseSize($post_max);
-$target_size = 200 * 1024 * 1024; // 200MB
+$target_size = 200 * 1024 * 1024; // 300MB
 
 if ($upload_bytes < $target_size) {
     $errors[] = "❌ upload_max_filesize terlalu kecil! Target: 200M, Current: $upload_max";
